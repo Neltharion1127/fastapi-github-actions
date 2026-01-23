@@ -7,16 +7,22 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11","3.12","3.13"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python-version }}
       - name: Install uv
         run: pip install uv
       - name: Install deps
         run: uv sync
+      - name: Ruff lint
+        run: uv run ruff check .
       - name: Run tests
         run: uv run pytest -q
