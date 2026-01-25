@@ -12,6 +12,10 @@ async def count_requests(request: Request, call_next):
     REQUEST_COUNT += 1
     return await call_next(request)
 
+@app.get("/")
+def read_root():
+    return {"message": "This is a sample FastAPI application."}
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
