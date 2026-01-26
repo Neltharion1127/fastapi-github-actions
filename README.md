@@ -1,119 +1,133 @@
-# FastAPI GitHub Actions CI Demo
+# FastAPI Production-Style Deployment on AWS
 
-A minimal FastAPI service with **production-style Continuous Integration (CI)** using **GitHub Actions**.
+A minimal FastAPI service deployed using a **production-style AWS architecture**, focusing on **network isolation, secure ingress, and reproducible delivery** rather than application complexity.
 
-This repository demonstrates how to enforce **code quality and correctness** through automated linting and testing across **multiple Python versions**.
-
----
-
-## ✨ Features
-
-- FastAPI web service
-- Automated testing with `pytest`
-- Static code analysis with `ruff`
-- Dependency management via `uv` + `uv.lock`
-- GitHub Actions CI pipeline
-- Matrix testing on **Python 3.11 / 3.12 / 3.13**
-- Main branch protected by CI checks
+This repository demonstrates how a simple API can be deployed and operated with realistic infrastructure choices commonly used in industry.
 
 ---
 
-##  Project Structure
+## Overview
 
-```text
-.
-├── app/
-│   ├── __init__.py
-│   └── main.py          # FastAPI application
-├── tests/
-│   └── test_api.py      # API tests
-├── .github/
-│   └── workflows/
-│       └── ci.yaml      # GitHub Actions CI pipeline
-├── pyproject.toml
-├── uv.lock
-└── README.md
+This project implements a publicly accessible FastAPI service running on **AWS ECS Fargate**, fronted by an **Application Load Balancer (ALB)** with HTTPS enabled via **AWS Certificate Manager (ACM)**.
+
+The system is intentionally small in scope, but designed to reflect **real-world cloud deployment patterns**, including private networking, health checks, and CI-based image delivery.
+
+**Live endpoint:**  
+https://api.jensending.top
+
+The service is designed to be operationally lightweight and may be brought online as needed for demonstrations or validation, while preserving the full deployment setup.
+
+---
+
+## Architecture Summary
+
+High-level request flow:
+
+```
+Client
+  → Cloudflare DNS
+  → AWS Application Load Balancer (HTTPS)
+  → Target Group (HTTP, health-checked)
+  → ECS Fargate task (FastAPI)
 ```
 
+### Key Architecture Decisions
+
+- **TLS termination at ALB**  
+  HTTPS is terminated at the load balancer using ACM, keeping containers simple and avoiding certificate management inside ECS.
+
+- **Private subnets for application workloads**  
+  ECS tasks run without public IPs. Inbound traffic is only allowed from the ALB.
+
+- **Explicit ingress / egress separation**  
+  Public access is handled by the ALB, while outbound access from private subnets is provided via a NAT Gateway.
+
+- **Health-based routing**  
+  ALB forwards traffic only to healthy targets using HTTP health checks.
+
 ---
 
-##  API Endpoints
+## AWS Components Used
 
-| Method | Path       | Description                   |
-|--------|------------|-------------------------------|
-| GET    | `/health`  | Health check                  |
-| GET    | `/hello`   | Greeting endpoint             |
-| GET    | `/metrics` | In-process metrics (mock)     |
+- **Networking**
+  - VPC with public and private subnets (multi-AZ)
+  - Internet Gateway (ingress for ALB)
+  - NAT Gateway (egress for ECS tasks)
+
+- **Compute**
+  - ECS Fargate
+  - ECS Service with rolling deployments
+
+- **Load Balancing**
+  - Application Load Balancer
+  - Target Group (IP mode)
+
+- **Security**
+  - Security Groups with least-privilege rules
+  - No public IPs on application containers
+
+- **Container Registry**
+  - Amazon ECR
+
+- **Observability**
+  - CloudWatch Logs via `awslogs` driver
+
+---
+
+## Continuous Integration & Delivery
+
+This repository includes a **GitHub Actions pipeline** used for delivery rather than infrastructure provisioning.
+
+### CI / CD Flow
+
+1. Run tests and linting:
+   - `pytest`
+   - `ruff`
+2. Build Docker image
+3. Push image to Amazon ECR using **GitHub Actions OIDC**
+4. Deploy updated image via ECS service rollout
+
+The pipeline avoids long-lived AWS credentials by assuming an IAM role via OIDC.
+
+---
+
+## Application Endpoints
+
+| Method | Path       | Description          |
+|--------|------------|----------------------|
+| GET    | `/health`  | ALB health check     |
+| GET    | `/hello`   | Example API endpoint |
+| GET    | `/metrics` | In-process metrics   |
 
 ---
 
 ## Running Locally
 
-### 1. Install dependencies
-
 ```bash
 pip install uv
 uv sync
-```
-
-### 2. Run tests
-
-```bash
-uv run pytest -q
-```
-
-### 3. Run lint
-
-```bash
-uv run ruff check .
-```
-
-### 4. Start the server
-
-```bash
 uv run uvicorn app.main:app --reload
 ```
 
 ---
 
-## Continuous Integration (CI)
+## Project Scope
 
-This project uses **GitHub Actions** to automatically run checks on every push and pull request.
-
-### CI Pipeline Steps
-
-1. Checkout source code
-2. Set up Python environment
-3. Install dependencies via `uv`
-4. Run `ruff` for static analysis
-5. Run `pytest` for test verification
-
-### Python Version Matrix
-
-The CI pipeline validates the project against the following Python versions:
-
-- Python 3.11
-- Python 3.12
-- Python 3.13
-
-This ensures compatibility across multiple Python runtimes.
-
----
-
-## Why This Project Exists
-
-This repository is intentionally minimal.
-
-It serves primarily as a **template/demo repository** showcasing a clean and repeatable CI setup with GitHub Actions, rather than a feature-complete application.
+This project is **not** intended to be a feature-rich application.
 
 Its purpose is to demonstrate:
 
-- Clean project structure
-- Reliable dependency locking
-- Automated quality gates
-- Modern CI practices with GitHub Actions
+- Realistic AWS networking patterns
+- Secure ingress with HTTPS
+- Containerized workloads on ECS Fargate
+- CI-driven image delivery
+- Cost-aware deployment decisions
 
-It is designed as a **CI template** that can be reused for larger FastAPI or backend projects.
+The emphasis is on **system design and operational clarity**, rather than application logic.
+
+---
+
+## Notes on Cost Management
 
 ---
 
