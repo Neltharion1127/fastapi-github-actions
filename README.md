@@ -127,10 +127,6 @@ The emphasis is on **system design and operational clarity**, rather than applic
 
 ---
 
-## Notes on Cost Management
-
----
-
 ## License
 
 MIT
