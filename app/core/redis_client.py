@@ -1,33 +1,50 @@
-# @Time: 1/30/26 00:22
-# @Author: jie
-# @File: redis_client.py
-# @Description:
 import os
-import redis
+import redis.asyncio as redis
 
-REDIS_URL = os.getenv("REDIS_URL")
+"""
+Redis client utilities.
 
-if not REDIS_URL:
-    raise RuntimeError("REDIS_URL environment variable is not set")
+Design goals:
+- One shared Redis client per process
+- Async-compatible with FastAPI lifespan
+- Safe in CI / local environments without Redis
+- Fail-fast can be enabled explicitly via env
+"""
 
-rds = redis.from_url(REDIS_URL, decode_responses=True)
+
+REDIS_URL = os.getenv("REDIS_URL", "")
+
+redis_client = (
+    redis.from_url(
+        REDIS_URL,
+        decode_responses=True,  # return str instead of bytes
+    )
+    if REDIS_URL
+    else None
+)
 
 
 async def ping_redis() -> None:
     """
     Verify Redis connectivity at application startup.
 
-    Called from FastAPI lifespan (startup phase).
-    Fail fast if Redis is unreachable or misconfigured.
+    - If REDIS_URL is not set: no-op (useful for CI)
+    - If REDIS_URL is set but Redis is unreachable: raises exception
     """
-    rds.ping()
+    if redis_client is None:
+        # Redis not configured (CI / local without Redis)
+        return
+
+    await redis_client.ping()
 
 
 async def close_redis() -> None:
     """
     Gracefully close Redis connections at application shutdown.
 
-    Called from FastAPI lifespan (shutdown phase).
-    Safe to call even if Redis was never used.
+    Safe to call even if Redis was never configured or used.
     """
-    rds.close()
+    if redis_client is None:
+        return
+
+    await redis_client.close()
