@@ -1,6 +1,6 @@
 # @Time: 1/29/26 21:50
 # @Author: jie
-# @File: UserSession.py
+# @File: RefreshSession.py
 # @Description:
 from datetime import datetime
 from typing import Optional
@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db import Base
 
 
-class Session(Base):
+class RefreshSession(Base):
     """Represents a user session with refresh token information."""
     __tablename__ = "sessions"
 
@@ -19,4 +19,4 @@ class Session(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    user = relationship("User", backref="sessions")
+    user = relationship("User", back_populates="sessions")

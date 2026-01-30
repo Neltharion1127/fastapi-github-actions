@@ -1,32 +1,38 @@
-import time
-from fastapi import FastAPI, Request
+from contextlib import asynccontextmanager
 
-START_TIME = time.time()
-REQUEST_COUNT = 0
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.api import router
+from app.core import redis_client
+from app.db import Base, engine
+import os
 
-app = FastAPI()
 
-@app.middleware("http")
-async def count_requests(request: Request, call_next):
-    global REQUEST_COUNT
-    REQUEST_COUNT += 1
-    return await call_next(request)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if os.getenv("CREATE_TABLES_ON_STARTUP", "false").lower() == "true":
+        Base.metadata.create_all(bind=engine)
+    await redis_client.ping_redis()
+    yield
+    await redis_client.close_redis()
+app = FastAPI(lifespan=lifespan)
 
-@app.get("/")
-def read_root():
-    return {"message": "This is a sample FastAPI application."}
+# Register all endpoints
+app.include_router(router)
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
 
-@app.get("/hello")
-def hello(name: str = "world"):
-    return {"message": f"hello {name}"}
 
-@app.get("/metrics")
-def metrics():
-    return {
-        "uptime_seconds": int(time.time() - START_TIME),
-        "request_count": REQUEST_COUNT,
-    }
+# CORS for local frontend dev (cookie-based refresh token requires credentials)
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://web.jensending.top"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
