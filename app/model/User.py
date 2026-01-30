@@ -3,10 +3,13 @@
 # @File: User.py
 # @Description:
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from sqlalchemy import String, Integer, Boolean, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db import Base
+
+if TYPE_CHECKING:
+    from app.model.RefreshSession import RefreshSession
 
 
 class User(Base):

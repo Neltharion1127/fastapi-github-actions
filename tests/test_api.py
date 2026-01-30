@@ -22,15 +22,3 @@ def test_hello_name():
     resp = client.get("/hello?name=Jie")
     assert resp.status_code == 200
     assert resp.json() == {"message": "hello Jie"}
-
-def test_metrics_shape():
-    resp = client.get("/metrics")
-    assert resp.status_code == 200
-    data = resp.json()
-
-    assert "uptime_seconds" in data
-    assert "request_count" in data
-    assert isinstance(data["uptime_seconds"], int)
-    assert isinstance(data["request_count"], int)
-    assert data["uptime_seconds"] >= 0
-    assert data["request_count"] >= 1

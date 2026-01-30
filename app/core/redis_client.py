@@ -23,6 +23,9 @@ redis_client = (
     else None
 )
 
+# Alias for backward compatibility
+rds = redis_client
+
 
 async def ping_redis() -> None:
     """
