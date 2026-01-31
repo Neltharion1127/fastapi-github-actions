@@ -15,10 +15,6 @@ async def lifespan(app: FastAPI):
         engine = get_engine()
         if engine:
             Base.metadata.create_all(bind=engine)
-    
-    # Note: we no longer ping Redis on startup to allow graceful degradation
-    # Use /ready endpoint to check dependency health
-    
     yield
     
     # Cleanup on shutdown

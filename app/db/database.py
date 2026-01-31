@@ -7,7 +7,7 @@ from functools import lru_cache
 from typing import Optional
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, DeclarativeBase, Session
+from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from sqlalchemy.engine import Engine
 
 
