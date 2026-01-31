@@ -51,9 +51,17 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t fastapi-nginx:latest .
+          # Generate version tag: short SHA + timestamp
+          VERSION="${GITHUB_SHA::7}-$(date +%Y%m%d%H%M%S)"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          docker build -t fastapi-nginx:latest -t fastapi-nginx:$VERSION .
 
       - name: Tag and push to ECR
         run: |
-          docker tag fastapi-nginx:latest 229828754047.dkr.ecr.eu-west-2.amazonaws.com/fastapi-nginx:latest
-          docker push 229828754047.dkr.ecr.eu-west-2.amazonaws.com/fastapi-nginx:latest
+          ECR_REPO=229828754047.dkr.ecr.eu-west-2.amazonaws.com/fastapi-nginx
+          # Push both latest and versioned tag
+          docker tag fastapi-nginx:latest $ECR_REPO:latest
+          docker tag fastapi-nginx:$VERSION $ECR_REPO:$VERSION
+          docker push $ECR_REPO:latest
+          docker push $ECR_REPO:$VERSION
+          echo "Pushed: $ECR_REPO:latest and $ECR_REPO:$VERSION"
