@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
-from app.core.redis_client import rds
+from app.core.redis_client import get_redis_client
 from app.core.security import PasswordService
 from app.db.database import get_db
 from app.core.jwt import create_access_token
@@ -94,6 +94,7 @@ async def login(data: LoginRequest, response: Response, db=Depends(get_db)):
     db.refresh(session)
 
     # Async Redis call
+    rds = get_redis_client()
     if rds:
         await rds.setex(
             f"rt:{token_hash}",
@@ -125,6 +126,7 @@ async def refresh(request: Request, response: Response, db=Depends(get_db)):
     session = None
 
     # 1) Try Redis lookup first
+    rds = get_redis_client()
     if rds:
         sid = await rds.get(old_key)
         if sid is not None:
@@ -144,10 +146,11 @@ async def refresh(request: Request, response: Response, db=Depends(get_db)):
             raise HTTPException(status_code=401, detail="Refresh token expired")
 
         # Re-hydrate Redis with remaining TTL
-        if rds:
+        rds_client = get_redis_client()
+        if rds_client:
             remaining = int((session.expires_at - now).total_seconds())
             if remaining > 0:
-                await rds.setex(old_key, remaining, str(session.id))
+                await rds_client.setex(old_key, remaining, str(session.id))
 
     # 3) Validate session state (for redis-hit case)
     if session.revoked_at is not None:
@@ -155,8 +158,9 @@ async def refresh(request: Request, response: Response, db=Depends(get_db)):
 
     if session.expires_at <= now:
         # best-effort cleanup
-        if rds:
-            await rds.delete(old_key)
+        rds_cleanup = get_redis_client()
+        if rds_cleanup:
+            await rds_cleanup.delete(old_key)
         raise HTTPException(status_code=401, detail="Refresh token expired")
 
     # 4) Rotation: revoke old session + delete old redis key
@@ -218,6 +222,7 @@ async def logout(request: Request, response: Response, db=Depends(get_db)):
             db.commit()
 
         # Delete from Redis
+        rds = get_redis_client()
         if rds:
             await rds.delete(redis_key)
 

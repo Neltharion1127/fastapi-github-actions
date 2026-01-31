@@ -28,3 +28,30 @@ def metrics(current_user: dict = Depends(get_current_user)):
         "uptime_seconds": int(time.time() - START_TIME),
         "request_count": REQUEST_COUNT,
     }
+
+
+@metrics_router.get("/ready")
+async def ready():
+    """
+    Check all external dependencies for readiness.
+    
+    Returns 200 if all configured dependencies are healthy.
+    Returns 503 if any configured dependency is unhealthy.
+    """
+    from app.db import check_database_ready
+    from app.core.redis_client import check_redis_ready
+    
+    db_status = check_database_ready()
+    redis_status = await check_redis_ready()
+    
+    status = {**db_status, **redis_status}
+    
+    # Consider "not_configured" as acceptable (dependency is optional)
+    all_ok = all(v == "ok" or v == "not_configured" for v in status.values())
+    
+    if not all_ok:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail=status)
+    
+    return {"status": "ready", "dependencies": status}
+
