@@ -14,6 +14,7 @@ The system is intentionally small in scope, but designed to reflect **real-world
 
 **Live endpoint:**  
 https://api.jensending.top
+https://web.jensending.top
 
 The service is designed to be operationally lightweight and may be brought online as needed for demonstrations or validation, while preserving the full deployment setup.
 
@@ -134,7 +135,7 @@ The emphasis is on **system design and operational clarity**, rather than applic
 This backend can be paired with a small frontend client to demonstrate end-to-end flows.
 
 - Frontend repository: https://github.com/Neltharion1127/fastapi-frontend-github-actions
-- Live demo (if running): https://frontend.jensending.top
+- Live demo (if running): https://web.jensending.top
 
 The frontend is intentionally simple and exists only to showcase how the API is consumed from a browser client.
 
