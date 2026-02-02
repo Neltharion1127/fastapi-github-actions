@@ -17,6 +17,8 @@ https://api.jensending.top
 
 The service is designed to be operationally lightweight and may be brought online as needed for demonstrations or validation, while preserving the full deployment setup.
 
+A minimal frontend client is also used alongside this API to demonstrate end-to-end usage (e.g., login and authenticated requests). See the **Frontend** section below for where to view it.
+
 ---
 
 ## Architecture Summary
@@ -124,6 +126,17 @@ Its purpose is to demonstrate:
 - Cost-aware deployment decisions
 
 The emphasis is on **system design and operational clarity**, rather than application logic.
+
+---
+
+## Frontend
+
+This backend can be paired with a small frontend client to demonstrate end-to-end flows.
+
+- Frontend repository: https://github.com/Neltharion1127/fastapi-frontend-github-actions
+- Live demo (if running): https://frontend.jensending.top
+
+The frontend is intentionally simple and exists only to showcase how the API is consumed from a browser client.
 
 ---
 

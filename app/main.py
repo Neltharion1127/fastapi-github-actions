@@ -27,16 +27,17 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(router)
 
 
-# CORS for local frontend dev (cookie-based refresh token requires credentials)
-ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://web.jensending.top"
-]
+# CORS configuration from environment variable
+# Local dev: "http://localhost:5173,http://127.0.0.1:5173"
+# AWS prod: "https://web.jensending.top"
+ALLOWED_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS", 
+    "http://localhost:5173,http://127.0.0.1:5173"
+).split(",")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=[origin.strip() for origin in ALLOWED_ORIGINS],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
