@@ -31,8 +31,21 @@ Client
   → Cloudflare DNS
   → AWS Application Load Balancer (HTTPS)
   → Target Group (HTTP, health-checked)
-  → ECS Fargate task (FastAPI)
+  → ECS Fargate task
+      ├── FastAPI + Nginx (app container)
+      ├── Valkey (Redis-compatible cache)
+      └── PostgreSQL (database)
 ```
+
+### Multi-Container ECS Task
+
+All three containers run in the **same ECS task**, sharing `localhost` for inter-container communication:
+
+| Container | Port | Purpose                       |
+| --------- | ---- | ----------------------------- |
+| app       | 80   | FastAPI + Nginx reverse proxy |
+| valkey    | 6379 | Session/cache storage         |
+| postgres  | 5432 | Application database          |
 
 ### Key Architecture Decisions
 
@@ -42,11 +55,14 @@ Client
 - **Private subnets for application workloads**  
   ECS tasks run without public IPs. Inbound traffic is only allowed from the ALB.
 
-- **Explicit ingress / egress separation**  
-  Public access is handled by the ALB, while outbound access from private subnets is provided via a NAT Gateway.
+- **VPC Endpoints instead of NAT Gateway**  
+  Uses VPC Endpoints for ECR, S3, and CloudWatch Logs to avoid NAT Gateway costs (~$30/month savings).
 
 - **Health-based routing**  
   ALB forwards traffic only to healthy targets using HTTP health checks.
+
+- **Infrastructure as Code**  
+  All AWS resources are managed via Terraform for reproducibility and version control.
 
 ---
 
@@ -55,10 +71,10 @@ Client
 - **Networking**
   - VPC with public and private subnets (multi-AZ)
   - Internet Gateway (ingress for ALB)
-  - NAT Gateway (egress for ECS tasks)
+  - VPC Endpoints (ECR, S3, CloudWatch Logs)
 
 - **Compute**
-  - ECS Fargate
+  - ECS Fargate (3 containers per task)
   - ECS Service with rolling deployments
 
 - **Load Balancing**
@@ -74,6 +90,33 @@ Client
 
 - **Observability**
   - CloudWatch Logs via `awslogs` driver
+
+---
+
+## Terraform
+
+Infrastructure is defined in the `terraform/` directory:
+
+```
+terraform/
+├── main.tf              # Provider configuration
+├── vpc.tf               # VPC, subnets, route tables
+├── endpoints.tf         # VPC Endpoints
+├── security-groups.tf   # ALB and ECS security groups
+├── alb.tf               # Application Load Balancer
+├── iam.tf               # IAM roles for ECS
+├── ecs.tf               # Cluster, task definition, service
+└── output.tf            # Outputs (ALB DNS, etc.)
+```
+
+### Deploy Infrastructure
+
+```bash
+cd terraform
+terraform init
+terraform plan
+terraform apply
+```
 
 ---
 
@@ -97,8 +140,9 @@ The pipeline avoids long-lived AWS credentials by assuming an IAM role via OIDC.
 ## Application Endpoints
 
 | Method | Path       | Description          |
-|--------|------------|----------------------|
+| ------ | ---------- | -------------------- |
 | GET    | `/health`  | ALB health check     |
+| GET    | `/ready`   | Dependency readiness |
 | GET    | `/hello`   | Example API endpoint |
 | GET    | `/metrics` | In-process metrics   |
 
@@ -106,9 +150,24 @@ The pipeline avoids long-lived AWS credentials by assuming an IAM role via OIDC.
 
 ## Running Locally
 
+### Option 1: Docker Compose (recommended)
+
+```bash
+docker-compose up --build
+```
+
+This starts all three containers (app, valkey, postgres) locally.
+
+### Option 2: Direct Python
+
 ```bash
 pip install uv
 uv sync
+
+# Start dependencies
+docker-compose up valkey postgres -d
+
+# Run app
 uv run uvicorn app.main:app --reload
 ```
 
@@ -122,9 +181,10 @@ Its purpose is to demonstrate:
 
 - Realistic AWS networking patterns
 - Secure ingress with HTTPS
-- Containerized workloads on ECS Fargate
+- Multi-container ECS Fargate tasks
 - CI-driven image delivery
-- Cost-aware deployment decisions
+- Cost-aware deployment decisions (VPC Endpoints vs NAT Gateway)
+- Infrastructure as Code with Terraform
 
 The emphasis is on **system design and operational clarity**, rather than application logic.
 
