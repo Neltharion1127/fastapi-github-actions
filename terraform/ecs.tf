@@ -1,6 +1,3 @@
-# ecs.tf - ECS Cluster, Task Definition, Service
-
-# CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "app" {
   name              = "/ecs/fastapi-app"
   retention_in_days = 7
@@ -10,7 +7,6 @@ resource "aws_cloudwatch_log_group" "app" {
   }
 }
 
-# ECS Cluster
 resource "aws_ecs_cluster" "main" {
   name = "fastapi-cluster"
 
@@ -24,7 +20,6 @@ resource "aws_ecs_cluster" "main" {
   }
 }
 
-# Task Definition
 resource "aws_ecs_task_definition" "app" {
   family                   = "fastapi-app"
   network_mode             = "awsvpc"
@@ -34,8 +29,12 @@ resource "aws_ecs_task_definition" "app" {
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
+  runtime_platform {
+    operating_system_family = "LINUX"
+    cpu_architecture        = "ARM64"
+  }
+
   container_definitions = jsonencode([
-    # App
     {
       name      = "app"
       image     = "229828754047.dkr.ecr.eu-west-2.amazonaws.com/fastapi-nginx:latest"
@@ -52,7 +51,8 @@ resource "aws_ecs_task_definition" "app" {
         { name = "JWT_SECRET", value = "change-me-in-production" },
         { name = "REFRESH_COOKIE_SECURE", value = "true" },
         { name = "REFRESH_COOKIE_SAMESITE", value = "lax" },
-        { name = "ALLOWED_ORIGINS", value = "https://web.jensending.top" }
+        { name = "ALLOWED_ORIGINS", value = "https://web.jensending.top" },
+        { name = "CREATE_TABLES_ON_STARTUP", value = "true" }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -71,7 +71,7 @@ resource "aws_ecs_task_definition" "app" {
     # Valkey
     {
       name      = "valkey"
-      image     = "valkey/valkey:8"
+      image     = "229828754047.dkr.ecr.eu-west-2.amazonaws.com/valkey:8"
       essential = true
       portMappings = [
         {
@@ -91,7 +91,7 @@ resource "aws_ecs_task_definition" "app" {
     # Postgres
     {
       name      = "postgres"
-      image     = "postgres:16"
+      image     = "229828754047.dkr.ecr.eu-west-2.amazonaws.com/postgres:16"
       essential = true
       portMappings = [
         {
@@ -125,12 +125,17 @@ resource "aws_ecs_service" "app" {
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.app.arn
   desired_count   = 1
-  launch_type     = "FARGATE"
+
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE_SPOT"
+    weight            = 1
+    base              = 0
+  }
 
   network_configuration {
-    subnets          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
+    subnets          = [aws_subnet.public_a.id, aws_subnet.public_b.id]
     security_groups  = [aws_security_group.ecs.id]
-    assign_public_ip = false
+    assign_public_ip = true
   }
 
   load_balancer {
@@ -138,6 +143,8 @@ resource "aws_ecs_service" "app" {
     container_name   = "app"
     container_port   = 80
   }
+
+  health_check_grace_period_seconds = 120
 
   depends_on = [aws_lb_listener.https]
 

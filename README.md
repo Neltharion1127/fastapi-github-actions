@@ -50,19 +50,43 @@ All three containers run in the **same ECS task**, sharing `localhost` for inter
 ### Key Architecture Decisions
 
 - **TLS termination at ALB**  
-  HTTPS is terminated at the load balancer using ACM, keeping containers simple and avoiding certificate management inside ECS.
+  HTTPS is terminated at the load balancer using ACM, keeping containers simple.
 
-- **Private subnets for application workloads**  
-  ECS tasks run without public IPs. Inbound traffic is only allowed from the ALB.
+- **Public subnets with Public IP**  
+  ECS tasks run in public subnets with public IP for direct internet access. Inbound traffic is still restricted to ALB only via security groups.
 
-- **VPC Endpoints instead of NAT Gateway**  
-  Uses VPC Endpoints for ECR, S3, and CloudWatch Logs to avoid NAT Gateway costs (~$30/month savings).
+- **Fargate Spot (~70% cost savings)**  
+  Uses spare AWS capacity at significant discount. Trade-off: tasks may be interrupted with 2-minute warning.
+
+- **ARM64 architecture (~20% cost savings)**  
+  Graviton processors are cheaper than x86. Images are built on Mac M-series and pushed to ECR.
 
 - **Health-based routing**  
   ALB forwards traffic only to healthy targets using HTTP health checks.
 
 - **Infrastructure as Code**  
-  All AWS resources are managed via Terraform for reproducibility and version control.
+  All AWS resources are managed via Terraform.
+
+---
+
+## Cost Optimization & Trade-offs
+
+### Current Monthly Estimate: ~$29/month
+
+| Component                    | Cost | Notes                             |
+| ---------------------------- | ---- | --------------------------------- |
+| Fargate Spot (0.5 vCPU, 1GB) | ~$4  | ARM64, 70% cheaper than On-Demand |
+| ALB                          | ~$24 | Fixed cost + LCU                  |
+| CloudWatch, ECR, etc.        | ~$1  | Minimal usage                     |
+
+### Design Trade-offs
+
+| Choice               | Benefit                   | Trade-off                                                |
+| -------------------- | ------------------------- | -------------------------------------------------------- |
+| **Public subnets**   | No VPC Endpoints needed   | ECS tasks have public IPs (mitigated by security groups) |
+| **Fargate Spot**     | 70% compute savings       | Tasks may be interrupted (2-min warning)                 |
+| **In-task Postgres** | Simple setup, no RDS cost | Data lost on restart (acceptable for demo)               |
+| **1GB memory**       | Lower cost                | May OOM under heavy load                                 |
 
 ---
 
@@ -70,26 +94,26 @@ All three containers run in the **same ECS task**, sharing `localhost` for inter
 
 - **Networking**
   - VPC with public and private subnets (multi-AZ)
-  - Internet Gateway (ingress for ALB)
-  - VPC Endpoints (ECR, S3, CloudWatch Logs)
+  - Internet Gateway
+  - S3 Gateway Endpoint (free, speeds up ECR pulls)
 
 - **Compute**
-  - ECS Fargate (3 containers per task)
-  - ECS Service with rolling deployments
+  - ECS Fargate Spot (ARM64)
+  - 3 containers per task (app, valkey, postgres)
 
 - **Load Balancing**
   - Application Load Balancer
-  - Target Group (IP mode)
+  - Target Group (IP mode, health-checked)
 
 - **Security**
-  - Security Groups with least-privilege rules
-  - No public IPs on application containers
+  - Security Groups (ALB → ECS only)
+  - ECS tasks have public IPs but restricted inbound
 
 - **Container Registry**
   - Amazon ECR
 
 - **Observability**
-  - CloudWatch Logs via `awslogs` driver
+  - CloudWatch Logs (7-day retention)
 
 ---
 
@@ -101,7 +125,7 @@ Infrastructure is defined in the `terraform/` directory:
 terraform/
 ├── main.tf              # Provider configuration
 ├── vpc.tf               # VPC, subnets, route tables
-├── endpoints.tf         # VPC Endpoints
+├── endpoints.tf         # S3 Gateway Endpoint
 ├── security-groups.tf   # ALB and ECS security groups
 ├── alb.tf               # Application Load Balancer
 ├── iam.tf               # IAM roles for ECS
@@ -183,10 +207,10 @@ Its purpose is to demonstrate:
 - Secure ingress with HTTPS
 - Multi-container ECS Fargate tasks
 - CI-driven image delivery
-- Cost-aware deployment decisions (VPC Endpoints vs NAT Gateway)
+- Cost-conscious deployment (Fargate Spot, public subnets, ARM64)
 - Infrastructure as Code with Terraform
 
-The emphasis is on **system design and operational clarity**, rather than application logic.
+The emphasis is on **system design, operational clarity, and cost optimization**.
 
 ---
 

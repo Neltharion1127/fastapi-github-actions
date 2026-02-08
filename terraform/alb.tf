@@ -1,4 +1,3 @@
-# arn:aws:acm:eu-west-2:229828754047:certificate/9e11aaa2-38fd-43bc-925b-d72be9855cff
 resource "aws_lb" "main" {
   name               = "fastapi-github-actions-alb"
   internal           = false

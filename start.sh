@@ -2,6 +2,7 @@
 set -e
 
 # Start nginx (daemonizes by default on Debian)
+nginx -t
 nginx
 
 # Start FastAPI behind nginx

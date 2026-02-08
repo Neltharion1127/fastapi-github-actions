@@ -22,7 +22,6 @@ resource "aws_iam_role_policy_attachment" "ecs_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# for future
 resource "aws_iam_role" "ecs_task" {
   name = "fastapi-ecs-task-role"
   assume_role_policy = jsonencode({
