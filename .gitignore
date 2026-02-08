@@ -8,3 +8,9 @@ wheels/
 .idea
 # Virtual environments
 .venv
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
